@@ -40,16 +40,21 @@ st.markdown("""
 def load_data_and_model():
     with st.spinner('Loading data and model...'):
         try:
-            # Load the pre-trained model and preprocessors
-            model = joblib.load('models/fitness_model.joblib')
+            # Load the pre-trained RandomForest model
+            model = joblib.load('models/fitness_model_rf.joblib')
             
-            # Load the processed data directly
+            # Load the processed data
             df = pd.read_csv('models/processed_fitness_claim_dataset.csv')
             
-            return df, model
+            # Load preprocessors if needed
+            label_encoders = joblib.load('models/label_encoders.joblib')
+            scaler = joblib.load('models/scaler.joblib')
+            feature_names = joblib.load('models/feature_names.joblib')
+            
+            return df, model, label_encoders, scaler, feature_names
         except Exception as e:
             st.error(f"Error loading model and data: {str(e)}")
-            return None, None
+            return None, None, None, None, None
 
 def create_pdf_certificate(data, fitness_score, discount):
     pdf = FPDF()
@@ -321,8 +326,12 @@ def display_model_metrics(df, rf_regressor):
 def fitness_score_page():
     st.title('Fitness Score & Insurance Discount Calculator')
     
-    # Load data and model
-    df, rf_regressor = load_data_and_model()
+    # Load data, model and preprocessors
+    df, rf_regressor, label_encoders, scaler, feature_names = load_data_and_model()
+    
+    if df is None or rf_regressor is None:
+        st.error("Failed to load required model files. Please check if all model files exist.")
+        return
     
     # Create tabs for different sections
     tab1, tab2, tab3 = st.tabs(["Calculate Score", "View Analytics", "Model Performance"])
