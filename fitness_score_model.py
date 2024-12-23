@@ -5,8 +5,6 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 import joblib
 import os
-from sklearn.linear_model import LinearRegression
-from sklearn.tree import DecisionTreeRegressor
 
 def train_and_save_model():
     print("Loading and preprocessing data...")
@@ -14,26 +12,38 @@ def train_and_save_model():
     df = pd.read_csv('fitness_claim_dataset.csv')
     df = df.dropna()
 
-    # Process categorical columns
-    categorical_columns = df.select_dtypes(include=['object']).columns.difference(['Name'])
-    label_encoders = {}
-    for column in categorical_columns:
-        le = LabelEncoder()
-        df[column] = le.fit_transform(df[column])
-        label_encoders[column] = le
+    # Define expected columns
+    expected_columns = [
+        'Name', 'Age', 'Blood Pressure (Systolic)', 'Blood Pressure (Diastolic)', 
+        'Heart Beats', 'BMI', 'Cholesterol', 'Steps Taken', 'Active Minutes',
+        'Sleep Duration', 'Sleep Quality', 'VO2 Max', 'Calories Burned',
+        'SpO2 Levels', 'Stress Levels', 'Claim Amount'
+    ]
 
-    # Scale numerical features
+    # Verify all expected columns are present
+    missing_columns = [col for col in expected_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing columns in dataset: {missing_columns}")
+
+    # Process categorical columns (in this case, only 'Name' is categorical)
+    categorical_columns = ['Name']
+    label_encoders = {}
+    
+    # Scale numerical features (all columns except 'Name' and 'Fitness Score')
+    numerical_columns = [col for col in df.columns if col not in ['Name', 'Fitness Score']]
     scaler = StandardScaler()
-    numerical_columns = df.select_dtypes(include=[np.number]).columns.difference(['Fitness Score'])
-    numerical_columns = sorted(numerical_columns)  # Sort to ensure consistent order
+    
+    # Sort numerical columns to ensure consistent order
+    numerical_columns = sorted(numerical_columns)
     
     # Save the order of numerical columns
     joblib.dump(numerical_columns, 'models/numerical_columns.joblib')
     
+    # Scale the features
     scaled_features = scaler.fit_transform(df[numerical_columns])
     df[numerical_columns] = scaled_features
 
-    # Calculate fitness score
+    # Calculate fitness score with weighted features
     df['Fitness Score'] = (
         0.1 * df['Blood Pressure (Systolic)'] +
         0.1 * df['Blood Pressure (Diastolic)'] +
@@ -57,28 +67,30 @@ def train_and_save_model():
     df.to_csv('models/processed_fitness_claim_dataset.csv', index=False)
 
     # Prepare features and target
-    X = df.drop(['Name', 'Fitness Score'], axis=1)
+    feature_columns = [col for col in numerical_columns if col != 'Claim Amount']
+    X = df[feature_columns]
     y = df['Fitness Score']
 
-    # Ensure consistent feature order
-    feature_names = sorted(X.columns.tolist())
-    X = X[feature_names]
-    
     # Save feature names in correct order
+    feature_names = sorted(feature_columns)
     joblib.dump(feature_names, 'models/feature_names.joblib')
 
-    # Split data and train
+    # Split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
     print("Training model...")
+    # Create and train a new RandomForestRegressor with updated parameters
     rf_regressor = RandomForestRegressor(
-        n_estimators=50,
-        max_depth=10,
+        n_estimators=100,
+        max_depth=15,
+        min_samples_split=5,
+        min_samples_leaf=2,
         random_state=42,
         n_jobs=-1
     )
     rf_regressor.fit(X_train, y_train)
     
+    # Create models directory if it doesn't exist
     if not os.path.exists('models'):
         os.makedirs('models')
 

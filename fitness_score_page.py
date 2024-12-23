@@ -310,49 +310,42 @@ def display_model_metrics(df, rf_regressor, label_encoders, scaler, feature_name
     y = df['Fitness Score']
     
     # Ensure columns are in the correct order
-    X = X[sorted(feature_names)]  # Sort to match training order
+    X = X[feature_names]
     
-    # Apply preprocessing to categorical columns
-    for column in X.select_dtypes(include=['object']).columns:
-        if column in label_encoders:
-            X[column] = label_encoders[column].transform(X[column])
+    # Split the data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    # Get numerical columns in the correct order
-    numerical_columns = sorted(X.select_dtypes(include=[np.number]).columns)
-    
-    # Create a copy of X with scaled numerical features
-    X_processed = X.copy()
-    X_processed[numerical_columns] = scaler.transform(X[numerical_columns])
-    
-    # Split the processed data
-    X_train, X_test, y_train, y_test = train_test_split(X_processed, y, test_size=0.2, random_state=42)
+    # Make predictions
+    try:
+        y_pred_test = rf_regressor.predict(X_test)
+        y_pred_train = rf_regressor.predict(X_train)
+        
+        # Calculate metrics
+        train_rmse = np.sqrt(mean_squared_error(y_train, y_pred_train))
+        test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
+        target_variance = np.var(y_test)
+        explained_variance_percentage = (1 - (test_rmse ** 2 / target_variance)) * 100
+        r_squared = r2_score(y_test, y_pred_test)
+        mae = mean_absolute_error(y_test, y_pred_test)
+        mse = mean_squared_error(y_test, y_pred_test)
 
-    # Calculate metrics
-    y_pred_train = rf_regressor.predict(X_train)
-    y_pred_test = rf_regressor.predict(X_test)
-
-    # Calculate performance metrics
-    train_rmse = np.sqrt(mean_squared_error(y_train, y_pred_train))
-    test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
-    target_variance = np.var(y_test)
-    explained_variance_percentage = (1 - (test_rmse ** 2 / target_variance)) * 100
-    r_squared = r2_score(y_test, y_pred_test)
-    mae = mean_absolute_error(y_test, y_pred_test)
-    mse = mean_squared_error(y_test, y_pred_test)
-
-    # Display metrics
-    st.write("## Model Performance Metrics")
-    metrics_cols = st.columns(2)
-    
-    with metrics_cols[0]:
-        st.metric("Train RMSE", f"{train_rmse:.2f}")
-        st.metric("Test RMSE", f"{test_rmse:.2f}")
-        st.metric("R-squared", f"{r_squared:.2f}")
-    
-    with metrics_cols[1]:
-        st.metric("MAE", f"{mae:.2f}")
-        st.metric("MSE", f"{mse:.2f}")
-        st.metric("Explained Variance", f"{explained_variance_percentage:.2f}%")
+        # Display metrics
+        st.write("## Model Performance Metrics")
+        metrics_cols = st.columns(2)
+        
+        with metrics_cols[0]:
+            st.metric("Train RMSE", f"{train_rmse:.2f}")
+            st.metric("Test RMSE", f"{test_rmse:.2f}")
+            st.metric("R-squared", f"{r_squared:.2f}")
+        
+        with metrics_cols[1]:
+            st.metric("MAE", f"{mae:.2f}")
+            st.metric("MSE", f"{mse:.2f}")
+            st.metric("Explained Variance", f"{explained_variance_percentage:.2f}%")
+            
+    except Exception as e:
+        st.error(f"Error calculating metrics: {str(e)}")
+        st.info("Please retrain the model to ensure compatibility with the current scikit-learn version.")
 
 def fitness_score_page():
     st.title('Fitness Score & Insurance Discount Calculator')
