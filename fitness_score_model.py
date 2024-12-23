@@ -24,7 +24,8 @@ def train_and_save_model():
 
     # Scale numerical features
     scaler = StandardScaler()
-    numerical_columns = df.select_dtypes(include=[np.number]).columns.difference(['Age'])
+    # Include Age in numerical columns for scaling
+    numerical_columns = df.select_dtypes(include=[np.number]).columns.difference(['Fitness Score'])
     scaled_features = scaler.fit_transform(df[numerical_columns])
     df[numerical_columns] = scaled_features
 
@@ -55,30 +56,29 @@ def train_and_save_model():
     X = df.drop(['Name', 'Fitness Score'], axis=1)
     y = df['Fitness Score']
 
+    # Save feature names before splitting
+    feature_names = X.columns.tolist()
+
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     print("Training model...")
-    
-    # Only keep the RandomForest model as it performs best
     rf_regressor = RandomForestRegressor(
         n_estimators=50,
         max_depth=10,
         random_state=42,
-        n_jobs=-1  # Use all CPU cores
+        n_jobs=-1
     )
     rf_regressor.fit(X_train, y_train)
     
-    # Create models directory if it doesn't exist
     if not os.path.exists('models'):
         os.makedirs('models')
 
     print("Saving model and preprocessors...")
-    # Save model and preprocessors
     joblib.dump(rf_regressor, 'models/fitness_model_rf.joblib')
     joblib.dump(label_encoders, 'models/label_encoders.joblib')
     joblib.dump(scaler, 'models/scaler.joblib')
-    joblib.dump(X.columns.tolist(), 'models/feature_names.joblib')
+    joblib.dump(feature_names, 'models/feature_names.joblib')
 
     print("Model training and saving completed!")
 

@@ -269,10 +269,23 @@ def get_health_status(fitness_score):
     else:
         return "Needs Improvement"
 
-def get_fitness_score_and_discount(df, rf_regressor, name, age):
+def get_fitness_score_and_discount(df, rf_regressor, name, age, label_encoders, scaler, feature_names):
     row = df[(df['Name'] == name) & (df['Age'] == age)]
     if not row.empty:
         features = row.drop(['Name', 'Fitness Score'], axis=1)
+        
+        # Apply preprocessing steps
+        for column in features.select_dtypes(include=['object']).columns:
+            if column in label_encoders:
+                features[column] = label_encoders[column].transform(features[column])
+        
+        numerical_cols = features.select_dtypes(include=[np.number]).columns
+        scaled_features = scaler.transform(features[numerical_cols])
+        features[numerical_cols] = scaled_features
+        
+        # Ensure the order of columns matches the training data
+        features = features[feature_names]
+        
         fitness_score = rf_regressor.predict(features)[0]
         discount = predict_discount(fitness_score)
         selected_data = row.iloc[0].to_dict()
@@ -296,32 +309,52 @@ def predict_discount(fitness_score):
     else:
         return 0  # No discount
 
-def display_model_metrics(df, rf_regressor):
+def display_model_metrics(df, rf_regressor, label_encoders, scaler, feature_names):
+    # Prepare features
     X = df.drop(['Name', 'Fitness Score'], axis=1)
     y = df['Fitness Score']
+    
+    # Ensure X has the same columns as feature_names
+    X = X[feature_names]
+    
+    # Apply preprocessing to the entire dataset
+    for column in X.select_dtypes(include=['object']).columns:
+        if column in label_encoders:
+            X[column] = label_encoders[column].transform(X[column])
+    
+    # Scale all numerical features using the pre-fitted scaler
+    X_scaled = scaler.transform(X)
+    X = pd.DataFrame(X_scaled, columns=X.columns)
+    
+    # Split the data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+    # Calculate metrics
     y_pred_train = rf_regressor.predict(X_train)
-    train_rmse = np.sqrt(mean_squared_error(y_train, y_pred_train))
-
     y_pred_test = rf_regressor.predict(X_test)
-    test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
 
+    # Calculate performance metrics
+    train_rmse = np.sqrt(mean_squared_error(y_train, y_pred_train))
+    test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
     target_variance = np.var(y_test)
     explained_variance_percentage = (1 - (test_rmse ** 2 / target_variance)) * 100
-
     r_squared = r2_score(y_test, y_pred_test)
     mae = mean_absolute_error(y_test, y_pred_test)
     mse = mean_squared_error(y_test, y_pred_test)
 
+    # Display metrics
     st.write("## Model Performance Metrics")
-    st.write(f"Train RMSE: {train_rmse:.2f}")
-    st.write(f"Test RMSE: {test_rmse:.2f}")
-    st.write(f"Explained Variance Percentage: {explained_variance_percentage:.2f}%")
-    st.write(f"R-squared: {r_squared:.2f}")
-    st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
-    st.write(f"Mean Squared Error (MSE): {mse:.2f}")
-    st.write(f"Root Mean Squared Error (RMSE): {test_rmse:.2f}")
+    metrics_cols = st.columns(2)
+    
+    with metrics_cols[0]:
+        st.metric("Train RMSE", f"{train_rmse:.2f}")
+        st.metric("Test RMSE", f"{test_rmse:.2f}")
+        st.metric("R-squared", f"{r_squared:.2f}")
+    
+    with metrics_cols[1]:
+        st.metric("MAE", f"{mae:.2f}")
+        st.metric("MSE", f"{mse:.2f}")
+        st.metric("Explained Variance", f"{explained_variance_percentage:.2f}%")
 
 def fitness_score_page():
     st.title('Fitness Score & Insurance Discount Calculator')
@@ -345,7 +378,7 @@ def fitness_score_page():
             
         if st.button('Calculate Fitness Score & Generate Certificate'):
             if name and age:
-                fitness_score, discount, selected_data = get_fitness_score_and_discount(df, rf_regressor, name, age)
+                fitness_score, discount, selected_data = get_fitness_score_and_discount(df, rf_regressor, name, age, label_encoders, scaler, feature_names)
                 if fitness_score is not None:
                     display_user_metrics(selected_data, fitness_score, discount)
                     
@@ -401,7 +434,7 @@ def fitness_score_page():
             st.plotly_chart(fig_age)
     
     with tab3:
-        display_model_metrics(df, rf_regressor)
+        display_model_metrics(df, rf_regressor, label_encoders, scaler, feature_names)
 
 # Main function to control page navigation
 def main():
@@ -410,7 +443,7 @@ def main():
 
     if page == "Home":
         st.title('Home Page')
-        st.write("Welcome to the Fitness Claim Discount Predictor app.")
+        st.write("Welcome to the Fitness Claim Discosunt Predictor app.")
     elif page == "AI Assistant":
         st.title('AI Assistant Page')
         st.write("This is the AI assistant page content.")
