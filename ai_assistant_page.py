@@ -64,7 +64,7 @@ def ai_assistant_page():
         }
         
         .dashboard-title {
-            font-size: 36px;
+            font-size: 32px;
             font-weight: bold;
             color: #ffffff;
             margin-bottom: 10px;
@@ -99,7 +99,7 @@ def ai_assistant_page():
 
     # Sidebar configuration
     with st.sidebar:
-        st.markdown("<h2 style='color: #ffa500;'>⚙️ Settings</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='color: white;'>Settings</h2>", unsafe_allow_html=True)
         hf_api_token = "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"
         if hf_api_token:
             st.success('API key loaded successfully!', icon='✅')
@@ -113,6 +113,7 @@ def ai_assistant_page():
 
         if st.button('Clear Chat', help="Clear the chat history"):
             clear_chat_history()
+            st.rerun()
 
     # Initialize chat history
     if "messages" not in st.session_state:
@@ -128,7 +129,7 @@ def ai_assistant_page():
         st.session_state.messages.append({"role": "user", "content": prompt})
         response = generate_insurance_assistant_response(prompt, client)
         st.session_state.messages.append({"role": "assistant", "content": response})
-        st.experimental_rerun()
+        st.rerun()
 
 if __name__ == "__main__":
     ai_assistant_page()

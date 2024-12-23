@@ -310,7 +310,7 @@ def display_model_metrics(df, rf_regressor, label_encoders, scaler, feature_name
     y = df['Fitness Score']
     
     # Ensure columns are in the correct order
-    X = X[feature_names]
+    X = X[sorted(feature_names)]  # Sort to match training order
     
     # Apply preprocessing to categorical columns
     for column in X.select_dtypes(include=['object']).columns:
@@ -318,7 +318,7 @@ def display_model_metrics(df, rf_regressor, label_encoders, scaler, feature_name
             X[column] = label_encoders[column].transform(X[column])
     
     # Get numerical columns in the correct order
-    numerical_columns = X.select_dtypes(include=[np.number]).columns
+    numerical_columns = sorted(X.select_dtypes(include=[np.number]).columns)
     
     # Create a copy of X with scaled numerical features
     X_processed = X.copy()

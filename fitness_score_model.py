@@ -25,8 +25,10 @@ def train_and_save_model():
     # Scale numerical features
     scaler = StandardScaler()
     numerical_columns = df.select_dtypes(include=[np.number]).columns.difference(['Fitness Score'])
+    numerical_columns = sorted(numerical_columns)  # Sort to ensure consistent order
+    
     # Save the order of numerical columns
-    joblib.dump(numerical_columns.tolist(), 'models/numerical_columns.joblib')
+    joblib.dump(numerical_columns, 'models/numerical_columns.joblib')
     
     scaled_features = scaler.fit_transform(df[numerical_columns])
     df[numerical_columns] = scaled_features
@@ -58,13 +60,16 @@ def train_and_save_model():
     X = df.drop(['Name', 'Fitness Score'], axis=1)
     y = df['Fitness Score']
 
+    # Ensure consistent feature order
+    feature_names = sorted(X.columns.tolist())
+    X = X[feature_names]
+    
     # Save feature names in correct order
-    feature_names = X.columns.tolist()
     joblib.dump(feature_names, 'models/feature_names.joblib')
 
-    # Split data
+    # Split data and train
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
+    
     print("Training model...")
     rf_regressor = RandomForestRegressor(
         n_estimators=50,

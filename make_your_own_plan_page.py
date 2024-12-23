@@ -178,7 +178,11 @@ def make_your_own_plan_page():
     st.title("Personalized Insurance Plan Generator")
     
     # Load fitness score model and data
-    df, rf_regressor = load_data_and_model()
+    df, rf_regressor, label_encoders, scaler, feature_names, numerical_columns = load_data_and_model()
+    
+    if df is None or rf_regressor is None:
+        st.error("Failed to load required model files. Please check if all model files exist.")
+        return
     
     # Create tabs for better organization
     tab1, tab2 = st.tabs(["Create Plan", "Fitness Details"])
@@ -213,7 +217,8 @@ def make_your_own_plan_page():
 
         # Get fitness score from the model
         if name and age:
-            fitness_score, discount, selected_data = get_fitness_score_and_discount(df, rf_regressor, name, age)
+            fitness_score, discount, selected_data = get_fitness_score_and_discount(
+                df, rf_regressor, name, age, label_encoders, scaler, feature_names)
             if fitness_score is not None:
                 st.success(f"Your fitness score has been calculated: {fitness_score:.2f}")
                 
