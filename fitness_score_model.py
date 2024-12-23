@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 import joblib
@@ -12,74 +12,94 @@ def train_and_save_model():
     df = pd.read_csv('fitness_claim_dataset.csv')
     df = df.dropna()
 
-    # Define expected columns
-    expected_columns = [
-        'Name', 'Age', 'Blood Pressure (Systolic)', 'Blood Pressure (Diastolic)', 
-        'Heart Beats', 'BMI', 'Cholesterol', 'Steps Taken', 'Active Minutes',
-        'Sleep Duration', 'Sleep Quality', 'VO2 Max', 'Calories Burned',
-        'SpO2 Levels', 'Stress Levels', 'Claim Amount'
+    # Define column types
+    id_columns = ['Name']
+    integer_columns = ['Age', 'Sleep Quality', 'Stress Levels', 'Active Minutes']
+    float_columns = [
+        'Blood Pressure (Systolic)', 'Blood Pressure (Diastolic)', 
+        'Heart Beats', 'BMI', 'Cholesterol', 'Steps Taken',
+        'Sleep Duration', 'VO2 Max', 'Calories Burned', 'SpO2 Levels'
     ]
+    target_column = 'Claim Amount'
 
     # Verify all expected columns are present
+    expected_columns = id_columns + integer_columns + float_columns + [target_column]
     missing_columns = [col for col in expected_columns if col not in df.columns]
     if missing_columns:
         raise ValueError(f"Missing columns in dataset: {missing_columns}")
 
-    # Process categorical columns (in this case, only 'Name' is categorical)
-    categorical_columns = ['Name']
-    label_encoders = {}
-    
-    # Scale numerical features (all columns except 'Name' and 'Fitness Score')
-    numerical_columns = [col for col in df.columns if col not in ['Name', 'Fitness Score']]
+    # Convert columns to appropriate types
+    for col in integer_columns:
+        df[col] = df[col].astype(int)
+    for col in float_columns:
+        df[col] = df[col].astype(float)
+
+    # Initialize scaler
     scaler = StandardScaler()
     
-    # Sort numerical columns to ensure consistent order
-    numerical_columns = sorted(numerical_columns)
+    # Scale only the float columns
+    scaled_features = scaler.fit_transform(df[float_columns])
+    scaled_df = pd.DataFrame(scaled_features, columns=float_columns)
     
-    # Save the order of numerical columns
-    joblib.dump(numerical_columns, 'models/numerical_columns.joblib')
-    
-    # Scale the features
-    scaled_features = scaler.fit_transform(df[numerical_columns])
-    df[numerical_columns] = scaled_features
+    # Combine scaled and unscaled features for ML
+    X = pd.concat([
+        df[integer_columns],  # Keep integers as is
+        scaled_df  # Add scaled float features
+    ], axis=1)
 
-    # Calculate fitness score with weighted features
+    # Calculate fitness score using scaled features
     df['Fitness Score'] = (
-        0.1 * df['Blood Pressure (Systolic)'] +
-        0.1 * df['Blood Pressure (Diastolic)'] +
-        0.15 * df['Heart Beats'] +
-        0.15 * df['BMI'] +
-        0.1 * df['Cholesterol'] +
-        0.2 * df['Steps Taken'] +
-        0.1 * df['Active Minutes'] +
-        0.1 * df['Sleep Duration'] +
-        0.05 * df['Sleep Quality'] +
-        0.15 * df['VO2 Max'] +
-        0.1 * df['Calories Burned'] +
-        0.15 * df['SpO2 Levels'] +
-        -0.2 * df['Stress Levels']
+        0.1 * scaled_df['Blood Pressure (Systolic)'] +
+        0.1 * scaled_df['Blood Pressure (Diastolic)'] +
+        0.15 * scaled_df['Heart Beats'] +
+        0.15 * scaled_df['BMI'] +
+        0.1 * scaled_df['Cholesterol'] +
+        0.2 * scaled_df['Steps Taken'] +
+        0.1 * df['Active Minutes'].astype(float)/df['Active Minutes'].max() +
+        0.1 * scaled_df['Sleep Duration'] +
+        0.05 * df['Sleep Quality'].astype(float)/df['Sleep Quality'].max() +
+        0.15 * scaled_df['VO2 Max'] +
+        0.1 * scaled_df['Calories Burned'] +
+        0.15 * scaled_df['SpO2 Levels'] +
+        -0.2 * df['Stress Levels'].astype(float)/df['Stress Levels'].max()
     )
 
     # Normalize fitness score to 0-100 range
     df['Fitness Score'] = (df['Fitness Score'] - df['Fitness Score'].min()) / (df['Fitness Score'].max() - df['Fitness Score'].min()) * 100
 
-    # Save the processed DataFrame
-    df.to_csv('models/processed_fitness_claim_dataset.csv', index=False)
+    # Create models directory if it doesn't exist
+    if not os.path.exists('models'):
+        os.makedirs('models')
 
-    # Prepare features and target
-    feature_columns = [col for col in numerical_columns if col != 'Claim Amount']
-    X = df[feature_columns]
-    y = df['Fitness Score']
+    # Save two versions of the processed data:
+    
+    # 1. Normalized version for ML tasks
+    ml_df = pd.concat([
+        df[id_columns],  # Original ID columns
+        X,  # Scaled features
+        df[['Fitness Score', target_column]]  # Calculated and target columns
+    ], axis=1)
+    ml_df.to_csv('models/ml_processed_dataset.csv', index=False)
 
-    # Save feature names in correct order
-    feature_names = sorted(feature_columns)
-    joblib.dump(feature_names, 'models/feature_names.joblib')
+    # 2. Original values version for visualization
+    viz_df = pd.concat([
+        df[id_columns + integer_columns + float_columns],  # Original unscaled columns
+        df[['Fitness Score', target_column]]  # Calculated and target columns
+    ], axis=1)
+    viz_df.to_csv('models/viz_processed_dataset.csv', index=False)
 
-    # Split data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Prepare feature names in correct order
+    feature_names = integer_columns + float_columns
+    
+    # Split data for training
+    X_train, X_test, y_train, y_test = train_test_split(
+        X[feature_names], 
+        df['Fitness Score'], 
+        test_size=0.2, 
+        random_state=42
+    )
     
     print("Training model...")
-    # Create and train a new RandomForestRegressor with updated parameters
     rf_regressor = RandomForestRegressor(
         n_estimators=100,
         max_depth=15,
@@ -89,15 +109,13 @@ def train_and_save_model():
         n_jobs=-1
     )
     rf_regressor.fit(X_train, y_train)
-    
-    # Create models directory if it doesn't exist
-    if not os.path.exists('models'):
-        os.makedirs('models')
 
     print("Saving model and preprocessors...")
     joblib.dump(rf_regressor, 'models/fitness_model_rf.joblib')
-    joblib.dump(label_encoders, 'models/label_encoders.joblib')
     joblib.dump(scaler, 'models/scaler.joblib')
+    joblib.dump(feature_names, 'models/feature_names.joblib')
+    joblib.dump(float_columns, 'models/float_columns.joblib')
+    joblib.dump(integer_columns, 'models/integer_columns.joblib')
 
     print("Model training and saving completed!")
 
