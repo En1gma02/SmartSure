@@ -77,7 +77,7 @@ def home_page():
     st.markdown("<h1 class='dashboard-title'>Welcome to Smartsure!</h1>", unsafe_allow_html=True)
    
     
-    image_url = "https://i.ibb.co/3s7JppM/Insurance-logo.png"
+    image_url = "https://raw.githubusercontent.com/En1gma02/SmartSure/refs/heads/main/images/SmartSure_logo.png"
     st.markdown(f"""
     <div class='center-content'>
         <img src='{image_url}' width='175'>
