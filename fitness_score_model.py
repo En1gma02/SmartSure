@@ -24,8 +24,10 @@ def train_and_save_model():
 
     # Scale numerical features
     scaler = StandardScaler()
-    # Include Age in numerical columns for scaling
     numerical_columns = df.select_dtypes(include=[np.number]).columns.difference(['Fitness Score'])
+    # Save the order of numerical columns
+    joblib.dump(numerical_columns.tolist(), 'models/numerical_columns.joblib')
+    
     scaled_features = scaler.fit_transform(df[numerical_columns])
     df[numerical_columns] = scaled_features
 
@@ -56,8 +58,9 @@ def train_and_save_model():
     X = df.drop(['Name', 'Fitness Score'], axis=1)
     y = df['Fitness Score']
 
-    # Save feature names before splitting
+    # Save feature names in correct order
     feature_names = X.columns.tolist()
+    joblib.dump(feature_names, 'models/feature_names.joblib')
 
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -78,7 +81,6 @@ def train_and_save_model():
     joblib.dump(rf_regressor, 'models/fitness_model_rf.joblib')
     joblib.dump(label_encoders, 'models/label_encoders.joblib')
     joblib.dump(scaler, 'models/scaler.joblib')
-    joblib.dump(feature_names, 'models/feature_names.joblib')
 
     print("Model training and saving completed!")
 

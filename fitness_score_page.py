@@ -40,21 +40,16 @@ st.markdown("""
 def load_data_and_model():
     with st.spinner('Loading data and model...'):
         try:
-            # Load the pre-trained RandomForest model
             model = joblib.load('models/fitness_model_rf.joblib')
-            
-            # Load the processed data
             df = pd.read_csv('models/processed_fitness_claim_dataset.csv')
-            
-            # Load preprocessors if needed
             label_encoders = joblib.load('models/label_encoders.joblib')
             scaler = joblib.load('models/scaler.joblib')
             feature_names = joblib.load('models/feature_names.joblib')
-            
-            return df, model, label_encoders, scaler, feature_names
+            numerical_columns = joblib.load('models/numerical_columns.joblib')
+            return df, model, label_encoders, scaler, feature_names, numerical_columns
         except Exception as e:
             st.error(f"Error loading model and data: {str(e)}")
-            return None, None, None, None, None
+            return None, None, None, None, None, None
 
 def create_pdf_certificate(data, fitness_score, discount):
     pdf = FPDF()
@@ -314,20 +309,23 @@ def display_model_metrics(df, rf_regressor, label_encoders, scaler, feature_name
     X = df.drop(['Name', 'Fitness Score'], axis=1)
     y = df['Fitness Score']
     
-    # Ensure X has the same columns as feature_names
+    # Ensure columns are in the correct order
     X = X[feature_names]
     
-    # Apply preprocessing to the entire dataset
+    # Apply preprocessing to categorical columns
     for column in X.select_dtypes(include=['object']).columns:
         if column in label_encoders:
             X[column] = label_encoders[column].transform(X[column])
     
-    # Scale all numerical features using the pre-fitted scaler
-    X_scaled = scaler.transform(X)
-    X = pd.DataFrame(X_scaled, columns=X.columns)
+    # Get numerical columns in the correct order
+    numerical_columns = X.select_dtypes(include=[np.number]).columns
     
-    # Split the data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Create a copy of X with scaled numerical features
+    X_processed = X.copy()
+    X_processed[numerical_columns] = scaler.transform(X[numerical_columns])
+    
+    # Split the processed data
+    X_train, X_test, y_train, y_test = train_test_split(X_processed, y, test_size=0.2, random_state=42)
 
     # Calculate metrics
     y_pred_train = rf_regressor.predict(X_train)
@@ -359,8 +357,8 @@ def display_model_metrics(df, rf_regressor, label_encoders, scaler, feature_name
 def fitness_score_page():
     st.title('Fitness Score & Insurance Discount Calculator')
     
-    # Load data, model and preprocessors
-    df, rf_regressor, label_encoders, scaler, feature_names = load_data_and_model()
+    # Load data and model with numerical columns
+    df, rf_regressor, label_encoders, scaler, feature_names, numerical_columns = load_data_and_model()
     
     if df is None or rf_regressor is None:
         st.error("Failed to load required model files. Please check if all model files exist.")
